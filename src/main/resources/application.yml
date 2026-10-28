@@ -1,0 +1,91 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: product-activation-service
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  mvc:
+    problemdetails:
+      enabled: true
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/activation_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 25
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${SECURITY_JWT_JWK_SET_URI:https://auth.internal.example.com/.well-known/jwks.json}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# Integração com o Provedor Externo
+activation:
+  provider:
+    base-url: ${ACTIVATION_PROVIDER_BASE_URL:http://localhost:8089}
+    connect-timeout-ms: ${ACTIVATION_PROVIDER_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${ACTIVATION_PROVIDER_READ_TIMEOUT_MS:3000}
+    max-retries: 3
+    initial-backoff-ms: 500
+    backoff-multiplier: 2.0
+  reconciliation:
+    enabled: true
+    fixed-delay-ms: 15000
+    stuck-threshold-seconds: 30
+
+# Configurações de Resiliência (Resilience4j)
+resilience4j:
+  circuitbreaker:
+    instances:
+      providerClient:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+  retry:
+    instances:
+      providerClient:
+        max-attempts: 3
+        wait-duration: 500ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2.0
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - com.wallan.activation.domain.exception.ProviderIntegrationException

@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/provider/v1/activate"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "protocol": "PROT-EXT-987654",
+      "status": "SUCCESS",
+      "message": "Produto ativado com sucesso junto ao provedor de telecom"
+    }
+  }
+}

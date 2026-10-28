@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Serviço da Aplicação Spring Boot
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: product-activation-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/activation_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - ACTIVATION_PROVIDER_BASE_URL=http://wiremock:8080
+      - ACTIVATION_PROVIDER_CONNECT_TIMEOUT_MS=2000
+      - ACTIVATION_PROVIDER_READ_TIMEOUT_MS=3000
+      - SECURITY_JWT_JWK_SET_URI=http://wiremock:8080/.well-known/jwks.json
+    depends_on:
+      postgres:
+        condition: service_healthy
+      wiremock:
+        condition: service_started
+    networks:
+      - activation-network
+
+  # Banco de Dados Relacional PostgreSQL 16
+  postgres:
+    image: postgres:16-alpine
+    container_name: activation-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=activation_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d activation_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - activation-network
+
+  # Mock do Provedor Externo via WireMock
+  wiremock:
+    image: wiremock/wiremock:3.9.2-alpine
+    container_name: activation-wiremock
+    ports:
+      - "8089:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings:ro
+    networks:
+      - activation-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  activation-network:
+    driver: bridge
